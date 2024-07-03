@@ -18,6 +18,6 @@ func NewRouter() http.Handler {
 	r.Get("/", handler.RootHandler)
 	r.Get("/greet/{id}", handler.GreetHandler)
 	r.Get("/time", handler.TimeHandler)
-
+	r.Get("/coord/{coordinates}", handler.CoordHandler)
 	return r
 }

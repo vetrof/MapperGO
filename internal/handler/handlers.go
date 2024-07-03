@@ -21,3 +21,8 @@ func TimeHandler(w http.ResponseWriter, r *http.Request) {
 	currentTime := timeutil.CurrentTime()
 	fmt.Fprintf(w, "Server time: %s", currentTime)
 }
+
+func CoordHandler(w http.ResponseWriter, r *http.Request) {
+	coordinates := chi.URLParam(r, "coordinates")
+	fmt.Fprintf(w, "coordinates: %s", coordinates)
+}
