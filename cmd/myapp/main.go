@@ -1,13 +1,17 @@
 package main
 
 import (
-	"framrless/internal/router"
+	"gomap/internal/db"
+	"gomap/internal/router"
 	"log"
 	"net/http"
 	"os"
 )
 
 func main() {
+
+	db.InitPostgresDB()
+
 	r := router.NewRouter()
 
 	port := os.Getenv("PORT")

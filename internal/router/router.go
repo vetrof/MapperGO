@@ -1,11 +1,10 @@
 package router
 
 import (
-	"framrless/internal/handler"
-	"net/http"
-
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"gomap/internal/handler"
+	"net/http"
 )
 
 func NewRouter() http.Handler {
@@ -16,8 +15,12 @@ func NewRouter() http.Handler {
 
 	// Определение маршрутов
 	r.Get("/", handler.RootHandler)
-	r.Get("/greet/{id}", handler.GreetHandler)
-	r.Get("/time", handler.TimeHandler)
-	r.Get("/coord/{coordinates}", handler.CoordHandler)
+	r.Post("/set_gps", handler.SetGpsHandler)
+	r.Get("/current_map", handler.CurrentMapHandler)
+	r.Get("/list_my_gps", handler.ListMyGpsMapHandler)
+	r.Get("/near_place", handler.NearPlaceHandler)
+	r.Get("/place/{id}", handler.PlaceDetailHandler)
+	r.Get("/s_time", handler.ServerTimelHandler)
+	r.Get("/login", handler.LoginDetailHandler)
 	return r
 }
