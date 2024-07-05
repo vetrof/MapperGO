@@ -22,8 +22,7 @@ type User struct {
 }
 
 type UserPlace struct {
-	ID   string `gorm:"primarykey"`
-	User User   `gorm:"foreignKey:UserID"`
+	ID   uint `gorm:"primaryKey;autoIncrement"`
 	N    string
 	E    string
 	Info string
@@ -54,6 +53,7 @@ func InitPostgresDB() {
 		log.Fatal(err)
 	}
 	db.AutoMigrate(User{})
+	db.AutoMigrate(UserPlace{})
 }
 
 func CreateUser(user *User) (*User, error) {
@@ -68,6 +68,7 @@ func CreateUser(user *User) (*User, error) {
 func CreateUserPlace(place *UserPlace) (*UserPlace, error) {
 	place.E = "123"
 	place.N = "456"
+	place.Info = "456"
 	res := db.Create(&place)
 	if res.Error != nil {
 		return nil, res.Error

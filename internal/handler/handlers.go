@@ -2,6 +2,8 @@ package handler
 
 import (
 	"fmt"
+	"github.com/google/uuid"
+	"gomap/internal/db"
 	"gomap/internal/gps_utils"
 	"gomap/internal/timeutil"
 	"net/http"
@@ -17,6 +19,20 @@ func SetGpsHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+
+	// Создание новой записи для сохранения координат
+	userPlace := db.UserPlace{
+		//ID:   generateID(), // Функция для генерации уникального ID
+		N:    coords.N,
+		E:    coords.E,
+		Info: "some info", // Замените это необходимой информацией
+	}
+
+	if _, err := db.CreateUserPlace(&userPlace); err != nil {
+		http.Error(w, "Failed to save coordinates", http.StatusInternalServerError)
+		return
+	}
+
 	fmt.Fprintf(w, "SetGpsHandler N: %s, E: %s", coords.N, coords.E)
 }
 
@@ -43,4 +59,8 @@ func ServerTimelHandler(w http.ResponseWriter, r *http.Request) {
 
 func LoginDetailHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "Hello, World!")
+}
+
+func generateID() string {
+	return uuid.New().String()
 }
