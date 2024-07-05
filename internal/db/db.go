@@ -66,9 +66,9 @@ func CreateUser(user *User) (*User, error) {
 }
 
 func CreateUserPlace(place *UserPlace) (*UserPlace, error) {
-	place.E = "123"
-	place.N = "456"
-	place.Info = "456"
+	//place.E = "123"
+	//place.N = "456"
+	//place.Info = "456"
 	res := db.Create(&place)
 	if res.Error != nil {
 		return nil, res.Error
