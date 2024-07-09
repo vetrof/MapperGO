@@ -1,20 +1,20 @@
 package db
 
 import (
-	"database/sql"
 	"fmt"
+	"github.com/google/uuid"
+	"github.com/jinzhu/gorm"
+	_ "github.com/jinzhu/gorm/dialects/postgres"
+	"github.com/joho/godotenv"
 	"log"
 	"os"
-
-	"github.com/google/uuid"
-	"github.com/joho/godotenv"
-	_ "github.com/lib/pq"
 )
 
-var db *sql.DB
+var db *gorm.DB
+var err error
 
 type User struct {
-	ID         string
+	ID         string `gorm:"primaryKey;autoIncrement"`
 	Imei       string
 	TelegramId string
 	Email      string
@@ -22,7 +22,7 @@ type User struct {
 }
 
 type UserPlace struct {
-	ID   uint
+	ID   uint `gorm:"primaryKey;autoIncrement"`
 	N    string
 	E    string
 	Info string
@@ -33,7 +33,6 @@ func InitPostgresDB() {
 	if err != nil {
 		log.Fatal("Error loading .env file", err)
 	}
-
 	var (
 		host     = os.Getenv("DB_HOST")
 		port     = os.Getenv("DB_PORT")
@@ -41,72 +40,39 @@ func InitPostgresDB() {
 		dbName   = os.Getenv("DB_NAME")
 		password = os.Getenv("DB_PASSWORD")
 	)
-	dsn := fmt.Sprintf("host=%s port=%s user=%s dbname=%s password=%s sslmode=disable",
+	dsn := fmt.Sprintf("host=%s port=%s user=%s dbname=%s password=%s sslmode=disable search_path=%s",
 		host,
 		port,
 		dbUser,
 		dbName,
 		password,
+		"vetrof", // замените на имя вашей схемы
 	)
 
-	db, err = sql.Open("postgres", dsn)
+	db, err = gorm.Open("postgres", dsn)
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	// Проверка подключения к базе данных
-	if err = db.Ping(); err != nil {
-		log.Fatal("Cannot connect to database:", err)
-	}
-
-	// Создание таблиц, если они не существуют
-	createTables()
-}
-
-func createTables() {
-	userTableQuery := `
-	CREATE TABLE IF NOT EXISTS users (
-		id UUID PRIMARY KEY,
-		imei TEXT,
-		telegram_id TEXT,
-		email TEXT,
-		phone TEXT
-	);`
-
-	userPlaceTableQuery := `
-	CREATE TABLE IF NOT EXISTS user_places (
-		id SERIAL PRIMARY KEY,
-		n TEXT,
-		e TEXT,
-		info TEXT
-	);`
-
-	_, err := db.Exec(userTableQuery)
-	if err != nil {
-		log.Fatal("Error creating users table:", err)
-	}
-
-	_, err = db.Exec(userPlaceTableQuery)
-	if err != nil {
-		log.Fatal("Error creating user_places table:", err)
-	}
+	db.AutoMigrate(User{})
+	db.AutoMigrate(UserPlace{})
 }
 
 func CreateUser(user *User) (*User, error) {
 	user.ID = uuid.New().String()
-	query := `INSERT INTO users (id, imei, telegram_id, email, phone) VALUES ($1, $2, $3, $4, $5)`
-	_, err := db.Exec(query, user.ID, user.Imei, user.TelegramId, user.Email, user.Phone)
-	if err != nil {
-		return nil, err
+	res := db.Create(&user)
+	if res.Error != nil {
+		return nil, res.Error
 	}
 	return user, nil
 }
 
 func CreateUserPlace(place *UserPlace) (*UserPlace, error) {
-	query := `INSERT INTO user_places (n, e, info) VALUES ($1, $2, $3) RETURNING id`
-	err := db.QueryRow(query, place.N, place.E, place.Info).Scan(&place.ID)
-	if err != nil {
-		return nil, err
+	place.E = "123"
+	place.N = "456"
+	place.Info = "456"
+	res := db.Create(&place)
+	if res.Error != nil {
+		return nil, res.Error
 	}
 	return place, nil
 }
