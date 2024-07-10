@@ -70,8 +70,8 @@ func InitPostgresDB() {
 	}
 
 	// Создание таблиц, если они не существуют
-	createPostGIS()
 	createSchema(schema)
+	createPostGIS()
 	createTables()
 }
 
