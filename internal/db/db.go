@@ -23,9 +23,8 @@ type User struct {
 
 type UserPlace struct {
 	ID   uint
-	N    string
-	E    string
 	Info string
+	Geom string
 }
 
 type Place struct {
@@ -66,20 +65,15 @@ func InitPostgresDB() {
 	if err = db.Ping(); err != nil {
 		log.Fatal("Cannot connect to database:", err)
 	} else {
-		log.Println("connect to database OK")
+		log.Println("Connected to database OK")
 	}
 
-	// Создание таблиц, если они не существуют
+	// Создание схемы и расширения PostGIS
 	createSchema(schema)
 	createPostGIS()
-	createTables()
-}
 
-func createPostGIS() {
-	_, err := db.Exec("CREATE EXTENSION IF NOT EXISTS postgis;")
-	if err != nil {
-		log.Fatal("Error creating PostGIS extension:", err)
-	}
+	// Создание таблиц, если они не существуют
+	createTables(schema)
 }
 
 func createSchema(schema string) {
@@ -90,30 +84,36 @@ func createSchema(schema string) {
 	}
 }
 
-func createTables() {
-	userTableQuery := `
-	CREATE TABLE IF NOT EXISTS users (
+func createPostGIS() {
+	_, err := db.Exec("CREATE EXTENSION IF NOT EXISTS postgis;")
+	if err != nil {
+		log.Fatal("Error creating PostGIS extension:", err)
+	}
+}
+
+func createTables(schema string) {
+	userTableQuery := fmt.Sprintf(`
+	CREATE TABLE IF NOT EXISTS %s.users (
 		id UUID PRIMARY KEY,
 		imei TEXT,
 		telegram_id TEXT,
 		email TEXT,
 		phone TEXT
-	);`
+	);`, schema)
 
-	userPlaceTableQuery := `
-	CREATE TABLE IF NOT EXISTS user_places (
+	userPlaceTableQuery := fmt.Sprintf(`
+	CREATE TABLE IF NOT EXISTS %s.user_places (
 		id SERIAL PRIMARY KEY,
-		n TEXT,
-		e TEXT,
-		info TEXT
-	);`
+		info TEXT,
+		geom GEOGRAPHY(Point, 4326)
+	);`, schema)
 
-	placeTableQuery := `
-	CREATE TABLE IF NOT EXISTS places (
+	placeTableQuery := fmt.Sprintf(`
+	CREATE TABLE IF NOT EXISTS %s.places (
 		id SERIAL PRIMARY KEY,
 		name VARCHAR(100),
 		geom GEOGRAPHY(Point, 4326)
-	);`
+	);`, schema)
 
 	_, err := db.Exec(userTableQuery)
 	if err != nil {
@@ -133,7 +133,7 @@ func createTables() {
 
 func CreateUser(user *User) (*User, error) {
 	user.ID = uuid.New().String()
-	query := `INSERT INTO users (id, imei, telegram_id, email, phone) VALUES ($1, $2, $3, $4, $5)`
+	query := fmt.Sprintf(`INSERT INTO %s.users (id, imei, telegram_id, email, phone) VALUES ($1, $2, $3, $4, $5)`, os.Getenv("DB_SCHEMA"))
 	_, err := db.Exec(query, user.ID, user.Imei, user.TelegramId, user.Email, user.Phone)
 	if err != nil {
 		return nil, err
@@ -142,8 +142,8 @@ func CreateUser(user *User) (*User, error) {
 }
 
 func CreateUserPlace(place *UserPlace) (*UserPlace, error) {
-	query := `INSERT INTO user_places (n, e, info) VALUES ($1, $2, $3) RETURNING id`
-	err := db.QueryRow(query, place.N, place.E, place.Info).Scan(&place.ID)
+	query := fmt.Sprintf(`INSERT INTO %s.user_places (info, geom) VALUES ($1, ST_GeogFromText($2)) RETURNING id`, os.Getenv("DB_SCHEMA"))
+	err := db.QueryRow(query, place.Info, place.Geom).Scan(&place.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -151,7 +151,7 @@ func CreateUserPlace(place *UserPlace) (*UserPlace, error) {
 }
 
 func CreatePlace(place *Place) (*Place, error) {
-	query := `INSERT INTO places (name, geom) VALUES ($1, ST_GeogFromText($2)) RETURNING id`
+	query := fmt.Sprintf(`INSERT INTO %s.places (name, geom) VALUES ($1, ST_GeogFromText($2)) RETURNING id`, os.Getenv("DB_SCHEMA"))
 	err := db.QueryRow(query, place.Name, place.Geom).Scan(&place.ID)
 	if err != nil {
 		return nil, err

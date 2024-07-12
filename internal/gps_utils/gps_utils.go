@@ -6,8 +6,8 @@ import (
 )
 
 type GpsCoordinates struct {
-	N string `json:"n"`
-	E string `json:"e"`
+	Lat string `json:"lat"`
+	Lng string `json:"lng"`
 }
 
 // ParseRequestBody
