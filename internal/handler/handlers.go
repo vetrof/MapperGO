@@ -85,8 +85,24 @@ func ListMyGpsMapHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "CurrentMapHandler")
 }
 
-func NearPlaceHandler(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintf(w, "NearPlaceHandler")
+func NearPlaceHandler(response http.ResponseWriter, request *http.Request) {
+	decoder := json.NewDecoder(request.Body)
+	var coordinate gps_utils.GpsCoordinates
+	err := decoder.Decode(&coordinate)
+	if err != nil {
+		http.Error(response, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	places, err := db.GetNearPlaces(coordinate)
+	if err != nil {
+		http.Error(response, "Error getting near places", http.StatusInternalServerError)
+		return
+	}
+
+	// Преобразуем результат в JSON и отправляем клиенту
+	response.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(response).Encode(places)
 }
 
 func PlaceDetailHandler(w http.ResponseWriter, r *http.Request) {

@@ -19,7 +19,7 @@ func NewRouter() http.Handler {
 	r.Post("/create_place", handler.CreatePlaceGpsHandler)
 	r.Get("/current_map", handler.CurrentMapHandler)
 	r.Get("/list_my_gps", handler.ListMyGpsMapHandler)
-	r.Get("/near_place", handler.NearPlaceHandler)
+	r.Post("/near_place", handler.NearPlaceHandler)
 	r.Get("/place/{id}", handler.PlaceDetailHandler)
 	r.Get("/s_time", handler.ServerTimelHandler)
 	r.Get("/login", handler.LoginDetailHandler)

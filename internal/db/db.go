@@ -3,6 +3,7 @@ package db
 import (
 	"database/sql"
 	"fmt"
+	"gomap/internal/gps_utils"
 	"log"
 	"os"
 
@@ -28,9 +29,10 @@ type UserPlace struct {
 }
 
 type Place struct {
-	ID   uint
-	Name string
-	Geom string
+	ID       uint
+	Name     string
+	Geom     string
+	Distance float64
 }
 
 func InitPostgresDB() {
@@ -158,3 +160,81 @@ func CreatePlace(place *Place) (*Place, error) {
 	}
 	return place, nil
 }
+
+func GetNearPlaces(myPoint gps_utils.GpsCoordinates) ([]Place, error) {
+	lat := myPoint.Lat
+	lng := myPoint.Lng
+	fmt.Println("GetNearPlaces --->>> ", lat, lng)
+
+	//query := fmt.Sprintf(`
+	//	SELECT id, name, ST_AsText(geom), ST_Distance(geom, ST_SetSRID(ST_MakePoint($1, $2), 4326)) AS distance
+	//	FROM %s.places
+	//	ORDER BY distance ASC`, os.Getenv("DB_SCHEMA"))
+
+	query := fmt.Sprintf(`
+		SELECT id, name, ST_AsText(geom), ST_Distance(geom::geography, ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography) AS distance
+		FROM %s.places
+		ORDER BY distance ASC`, os.Getenv("DB_SCHEMA"))
+
+	rows, err := db.Query(query, lng, lat) // координаты подставляются как параметры
+
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var places []Place
+	for rows.Next() {
+		var place Place
+		err := rows.Scan(&place.ID, &place.Name, &place.Geom, &place.Distance)
+		if err != nil {
+			return nil, err
+		}
+		places = append(places, place)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return places, nil
+}
+
+//func GetNearPlaces(myPoint gps_utils.GpsCoordinates) ([]Place, error) {
+//	lat := myPoint.Lat
+//	lng := myPoint.Lng
+//	fmt.Println("GetNearPlaces --->>> ", lat, lng)
+//
+//	//query := fmt.Sprintf(`
+//	//	SELECT id, name, ST_AsText(geom)
+//	//	FROM %s.places
+//	//	ORDER BY ST_Distance(geom, ST_SetSRID(ST_MakePoint($1, $2), 4326)) ASC`, os.Getenv("DB_SCHEMA"))
+//
+//	query := fmt.Sprintf(`
+//		SELECT id, name, ST_AsText(geom), ST_Distance(geom, ST_SetSRID(ST_MakePoint($1, $2), 4326)) AS distance
+//		FROM %s.places
+//		ORDER BY distance ASC`, os.Getenv("DB_SCHEMA"))
+//
+//	rows, err := db.Query(query, lng, lat) // координаты подставляются как параметры
+//
+//	if err != nil {
+//		return nil, err
+//	}
+//	defer rows.Close()
+//
+//	var places []Place
+//	for rows.Next() {
+//		var place Place
+//		err := rows.Scan(&place.ID, &place.Name, &place.Geom)
+//		if err != nil {
+//			return nil, err
+//		}
+//		places = append(places, place)
+//	}
+
+//	if err = rows.Err(); err != nil {
+//		return nil, err
+//	}
+//
+//	return places, nil
+//}
