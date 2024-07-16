@@ -16,7 +16,7 @@ func NewRouter() http.Handler {
 	// Определение маршрутов
 	r.Get("/", handler.RootHandler)
 	r.Post("/set_gps", handler.SetGpsHandler)
-	r.Post("/create_place", handler.CreatePlaceGpsHandler)
+	r.Post("/create_place", handler.NewPlaceHandler)
 	r.Get("/current_map", handler.CurrentMapHandler)
 	r.Get("/list_my_gps", handler.ListMyGpsMapHandler)
 	r.Post("/near_place", handler.NearPlaceHandler)

@@ -9,6 +9,7 @@ import (
 	"gomap/internal/timeutil"
 	"log"
 	"net/http"
+	"strings"
 )
 
 func RootHandler(w http.ResponseWriter, r *http.Request) {
@@ -46,35 +47,43 @@ func SetGpsHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("Place saved successfully"))
 }
 
-func CreatePlaceGpsHandler(w http.ResponseWriter, r *http.Request) {
-	decoder := json.NewDecoder(r.Body)
-	var coordinate gps_utils.CoordinateRequest
-	err := decoder.Decode(&coordinate)
+func NewPlaceHandler(response http.ResponseWriter, request *http.Request) {
+	decoder := json.NewDecoder(request.Body)
+	var newPlaceReq gps_utils.NewPlace
+	err := decoder.Decode(&newPlaceReq)
 	if err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		http.Error(response, "Invalid request body", http.StatusBadRequest)
 		return
 	}
 
-	fmt.Println(coordinate)
+	// Split point into lat and lng
+	coords := strings.Split(newPlaceReq.Point, ",")
+	if len(coords) != 2 {
+		http.Error(response, "Invalid coordinates format", http.StatusBadRequest)
+		return
+	}
+	lat := strings.TrimSpace(coords[0])
+	lng := strings.TrimSpace(coords[1])
 
-	// Создаем объект места для сохранения в базу данных
+	fmt.Println("-->>", lat)
+	fmt.Println("-->>", lng)
+
+	// Create a new Place object
 	place := &db.Place{
-		Name: coordinate.Name,
-		Geom: "POINT(" + coordinate.Lng + " " + coordinate.Lat + ")",
+		Name: newPlaceReq.Name,
+		Geom: "POINT(" + lng + " " + lat + ")",
+		Desc: newPlaceReq.Desc,
 	}
 
-	fmt.Println(place)
-
-	// Вызываем функцию создания места в базе данных
+	// Call function to create the place in the database
 	_, err = db.CreatePlace(place)
 	if err != nil {
 		log.Println("Error creating place:", err)
-		http.Error(w, "Failed to save place", http.StatusInternalServerError)
+		http.Error(response, "Failed to save place", http.StatusInternalServerError)
 		return
 	}
 
-	w.WriteHeader(http.StatusCreated)
-	w.Write([]byte("Place saved successfully"))
+	response.Write([]byte("Place saved successfully"))
 }
 
 func CurrentMapHandler(w http.ResponseWriter, r *http.Request) {
@@ -100,7 +109,6 @@ func NearPlaceHandler(response http.ResponseWriter, request *http.Request) {
 		return
 	}
 
-	// Преобразуем результат в JSON и отправляем клиенту
 	response.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(response).Encode(places)
 }

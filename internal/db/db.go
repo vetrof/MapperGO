@@ -32,6 +32,7 @@ type Place struct {
 	ID       uint
 	Name     string
 	Geom     string
+	Desc     string
 	Distance float64
 }
 
@@ -114,6 +115,7 @@ func createTables(schema string) {
 	CREATE TABLE IF NOT EXISTS %s.places (
 		id SERIAL PRIMARY KEY,
 		name VARCHAR(100),
+	    description TEXT,
 		geom GEOGRAPHY(Point, 4326)
 	);`, schema)
 
@@ -153,8 +155,14 @@ func CreateUserPlace(place *UserPlace) (*UserPlace, error) {
 }
 
 func CreatePlace(place *Place) (*Place, error) {
-	query := fmt.Sprintf(`INSERT INTO %s.places (name, geom) VALUES ($1, ST_GeogFromText($2)) RETURNING id`, os.Getenv("DB_SCHEMA"))
-	err := db.QueryRow(query, place.Name, place.Geom).Scan(&place.ID)
+	query := `
+        INSERT INTO places (name, geom, description)
+        VALUES ($1, ST_GeomFromText($2, 4326), $3)
+        RETURNING id
+    `
+	var id int
+
+	err := db.QueryRow(query, place.Name, place.Geom, place.Desc).Scan(&id)
 	if err != nil {
 		return nil, err
 	}
@@ -166,17 +174,12 @@ func GetNearPlaces(myPoint gps_utils.GpsCoordinates) ([]Place, error) {
 	lng := myPoint.Lng
 	fmt.Println("GetNearPlaces --->>> ", lat, lng)
 
-	//query := fmt.Sprintf(`
-	//	SELECT id, name, ST_AsText(geom), ST_Distance(geom, ST_SetSRID(ST_MakePoint($1, $2), 4326)) AS distance
-	//	FROM %s.places
-	//	ORDER BY distance ASC`, os.Getenv("DB_SCHEMA"))
-
 	query := fmt.Sprintf(`
-		SELECT id, name, ST_AsText(geom), ST_Distance(geom::geography, ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography) AS distance
+		SELECT id, name, ST_AsText(geom), description, ST_Distance(geom::geography, ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography) AS distance
 		FROM %s.places
 		ORDER BY distance ASC`, os.Getenv("DB_SCHEMA"))
 
-	rows, err := db.Query(query, lng, lat) // координаты подставляются как параметры
+	rows, err := db.Query(query, lng, lat)
 
 	if err != nil {
 		return nil, err
@@ -186,7 +189,7 @@ func GetNearPlaces(myPoint gps_utils.GpsCoordinates) ([]Place, error) {
 	var places []Place
 	for rows.Next() {
 		var place Place
-		err := rows.Scan(&place.ID, &place.Name, &place.Geom, &place.Distance)
+		err := rows.Scan(&place.ID, &place.Name, &place.Geom, &place.Desc, &place.Distance)
 		if err != nil {
 			return nil, err
 		}
@@ -199,42 +202,3 @@ func GetNearPlaces(myPoint gps_utils.GpsCoordinates) ([]Place, error) {
 
 	return places, nil
 }
-
-//func GetNearPlaces(myPoint gps_utils.GpsCoordinates) ([]Place, error) {
-//	lat := myPoint.Lat
-//	lng := myPoint.Lng
-//	fmt.Println("GetNearPlaces --->>> ", lat, lng)
-//
-//	//query := fmt.Sprintf(`
-//	//	SELECT id, name, ST_AsText(geom)
-//	//	FROM %s.places
-//	//	ORDER BY ST_Distance(geom, ST_SetSRID(ST_MakePoint($1, $2), 4326)) ASC`, os.Getenv("DB_SCHEMA"))
-//
-//	query := fmt.Sprintf(`
-//		SELECT id, name, ST_AsText(geom), ST_Distance(geom, ST_SetSRID(ST_MakePoint($1, $2), 4326)) AS distance
-//		FROM %s.places
-//		ORDER BY distance ASC`, os.Getenv("DB_SCHEMA"))
-//
-//	rows, err := db.Query(query, lng, lat) // координаты подставляются как параметры
-//
-//	if err != nil {
-//		return nil, err
-//	}
-//	defer rows.Close()
-//
-//	var places []Place
-//	for rows.Next() {
-//		var place Place
-//		err := rows.Scan(&place.ID, &place.Name, &place.Geom)
-//		if err != nil {
-//			return nil, err
-//		}
-//		places = append(places, place)
-//	}
-
-//	if err = rows.Err(); err != nil {
-//		return nil, err
-//	}
-//
-//	return places, nil
-//}
