@@ -90,7 +90,7 @@ func Bot() {
 				bot.Send(msg)
 
 				for _, place := range places {
-					responseText := fmt.Sprintf("%s\n%d метров от вас.\n\n%s", place.Name, int(place.Distance), place.Desc)
+					responseText := fmt.Sprintf("------------------\n%s\n%d метров от вас.\n\n%s", place.Name, int(place.Distance), place.Desc)
 					msg := tgbotapi.NewMessage(update.Message.Chat.ID, responseText)
 					bot.Send(msg)
 
@@ -104,7 +104,7 @@ func Bot() {
 					bot.Send(locationMsg)
 
 					// Добавление отступа между сообщениями
-					separatorMsg := tgbotapi.NewMessage(update.Message.Chat.ID, "\n\n ")
+					separatorMsg := tgbotapi.NewMessage(update.Message.Chat.ID, "\n\n\n\n ")
 					bot.Send(separatorMsg)
 				}
 			} else {
