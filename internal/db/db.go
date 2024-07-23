@@ -119,6 +119,32 @@ func createTables(schema string) {
 		geom GEOGRAPHY(Point, 4326)
 	);`, schema)
 
+	placePhotoTableQuery := fmt.Sprintf(`
+	CREATE TABLE IF NOT EXISTS %s.place_photos (
+		id SERIAL PRIMARY KEY,
+		place_id INTEGER REFERENCES %s.places(id),
+		photo_url TEXT,
+		description TEXT    
+	);`, schema, schema)
+
+	placeAudioTableQuery := fmt.Sprintf(`
+	CREATE TABLE IF NOT EXISTS %s.place_audio (
+		id SERIAL PRIMARY KEY,
+		place_id INTEGER REFERENCES %s.places(id),
+		lang TEXT,
+		audio_url TEXT,
+		description TEXT 
+	);`, schema, schema)
+
+	placeLinkTableQuery := fmt.Sprintf(`
+	CREATE TABLE IF NOT EXISTS %s.place_link (
+		id SERIAL PRIMARY KEY,
+		place_id INTEGER REFERENCES %s.places(id),
+		name TEXT,
+		description TEXT, 
+		url TEXT
+	);`, schema, schema)
+
 	_, err := db.Exec(userTableQuery)
 	if err != nil {
 		log.Fatal("Error creating users table:", err)
@@ -132,6 +158,21 @@ func createTables(schema string) {
 	_, err = db.Exec(placeTableQuery)
 	if err != nil {
 		log.Fatal("Error creating places table:", err)
+	}
+
+	_, err = db.Exec(placePhotoTableQuery)
+	if err != nil {
+		log.Fatal("Error creating places photo table:", err)
+	}
+
+	_, err = db.Exec(placeAudioTableQuery)
+	if err != nil {
+		log.Fatal("Error creating places audio table:", err)
+	}
+
+	_, err = db.Exec(placeLinkTableQuery)
+	if err != nil {
+		log.Fatal("Error creating places link table:", err)
 	}
 }
 

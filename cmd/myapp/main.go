@@ -1,17 +1,24 @@
 package main
 
 import (
-	"gomap/internal/db"
-	"gomap/internal/router"
 	"log"
 	"net/http"
 	"os"
+
+	"gomap/internal/bot"
+	"gomap/internal/db"
+	"gomap/internal/router"
 )
 
 func main() {
 
+	// db init
 	db.InitPostgresDB()
 
+	// Bot init
+	bot.Bot()
+
+	// Server init
 	r := router.NewRouter()
 
 	port := os.Getenv("PORT")
