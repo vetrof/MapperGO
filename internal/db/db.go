@@ -1,21 +1,26 @@
 package db
 
 import (
-	"database/sql"
 	"fmt"
-	"gomap/internal/gps_utils"
 	"log"
 	"os"
 
+	"gomap/internal/gps_utils"
+
 	"github.com/google/uuid"
 	"github.com/joho/godotenv"
-	_ "github.com/lib/pq"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
 )
 
-var db *sql.DB
+var db *gorm.DB
+
+type City struct {
+	Name string `gorm:"primaryKey;uniqueIndex"`
+}
 
 type User struct {
-	ID         string
+	ID         string `gorm:"primaryKey"`
 	Imei       string
 	TelegramId string
 	Email      string
@@ -23,17 +28,19 @@ type User struct {
 }
 
 type UserPlace struct {
-	ID   uint
+	ID   uint `gorm:"primaryKey"`
 	Info string
-	Geom string
+	Geom string `gorm:"type:geography(Point,4326)"`
 }
 
 type Place struct {
-	ID       uint
+	ID       uint `gorm:"primaryKey"`
+	CityName string
+	City     City `gorm:"foreignKey:CityName;references:Name;constraint:OnUpdate:CASCADE,OnDelete:SET NULL;"`
 	Name     string
-	Geom     string
+	Geom     string `gorm:"type:geography(Point,4326)"`
 	Desc     string
-	Distance float64
+	Distance float64 `gorm:"-"`
 }
 
 func InitPostgresDB() {
@@ -59,169 +66,62 @@ func InitPostgresDB() {
 		schema,
 	)
 
-	db, err = sql.Open("postgres", dsn)
-	if err != nil {
-		log.Fatal(err)
+	var openErr error
+	db, openErr = gorm.Open(postgres.Open(dsn), &gorm.Config{})
+	if openErr != nil {
+		log.Fatal(openErr)
 	}
 
-	// Проверка подключения к базе данных
-	if err = db.Ping(); err != nil {
-		log.Fatal("Cannot connect to database:", err)
-	} else {
-		log.Println("Connected to database OK")
-	}
-
-	// Создание схемы и расширения PostGIS
-	createSchema(schema)
-	createPostGIS()
-
-	// Создание таблиц, если они не существуют
-	createTables(schema)
-}
-
-func createSchema(schema string) {
-	schemaQuery := fmt.Sprintf(`CREATE SCHEMA IF NOT EXISTS %s;`, schema)
-	_, err := db.Exec(schemaQuery)
-	if err != nil {
+	// Migrate the schema
+	if err := createSchema(schema); err != nil {
 		log.Fatal("Error creating schema:", err)
 	}
-}
 
-func createPostGIS() {
-	_, err := db.Exec("CREATE EXTENSION IF NOT EXISTS postgis;")
-	if err != nil {
+	if err := createPostGIS(); err != nil {
 		log.Fatal("Error creating PostGIS extension:", err)
 	}
+
+	// Auto-migrate the tables
+	if err := db.AutoMigrate(&City{}, &User{}, &UserPlace{}, &Place{}); err != nil {
+		log.Fatal("Error migrating tables:", err)
+	}
 }
 
-func createTables(schema string) {
-	userTableQuery := fmt.Sprintf(`
-	CREATE TABLE IF NOT EXISTS %s.users (
-		id UUID PRIMARY KEY,
-		imei TEXT,
-		telegram_id TEXT,
-		email TEXT,
-		phone TEXT
-	);`, schema)
+func createSchema(schema string) error {
+	schemaQuery := fmt.Sprintf(`CREATE SCHEMA IF NOT EXISTS %s;`, schema)
+	return db.Exec(schemaQuery).Error
+}
 
-	userPlaceTableQuery := fmt.Sprintf(`
-	CREATE TABLE IF NOT EXISTS %s.user_places (
-		id SERIAL PRIMARY KEY,
-		info TEXT,
-		geom GEOGRAPHY(Point, 4326)
-	);`, schema)
-
-	placeTableQuery := fmt.Sprintf(`
-	CREATE TABLE IF NOT EXISTS %s.places (
-		id SERIAL PRIMARY KEY,
-		name VARCHAR(100),
-	    description TEXT,
-		geom GEOGRAPHY(Point, 4326)
-	);`, schema)
-
-	placePhotoTableQuery := fmt.Sprintf(`
-	CREATE TABLE IF NOT EXISTS %s.place_photos (
-		id SERIAL PRIMARY KEY,
-		place_id INTEGER REFERENCES %s.places(id),
-		photo_url TEXT,
-		description TEXT    
-	);`, schema, schema)
-
-	placeAudioTableQuery := fmt.Sprintf(`
-	CREATE TABLE IF NOT EXISTS %s.place_audio (
-		id SERIAL PRIMARY KEY,
-		place_id INTEGER REFERENCES %s.places(id),
-		lang TEXT,
-		audio_url TEXT,
-		description TEXT 
-	);`, schema, schema)
-
-	placeLinkTableQuery := fmt.Sprintf(`
-	CREATE TABLE IF NOT EXISTS %s.place_link (
-		id SERIAL PRIMARY KEY,
-		place_id INTEGER REFERENCES %s.places(id),
-		name TEXT,
-		description TEXT, 
-		url TEXT
-	);`, schema, schema)
-
-	_, err := db.Exec(userTableQuery)
-	if err != nil {
-		log.Fatal("Error creating users table:", err)
-	}
-
-	_, err = db.Exec(userPlaceTableQuery)
-	if err != nil {
-		log.Fatal("Error creating user_places table:", err)
-	}
-
-	_, err = db.Exec(placeTableQuery)
-	if err != nil {
-		log.Fatal("Error creating places table:", err)
-	}
-
-	_, err = db.Exec(placePhotoTableQuery)
-	if err != nil {
-		log.Fatal("Error creating places photo table:", err)
-	}
-
-	_, err = db.Exec(placeAudioTableQuery)
-	if err != nil {
-		log.Fatal("Error creating places audio table:", err)
-	}
-
-	_, err = db.Exec(placeLinkTableQuery)
-	if err != nil {
-		log.Fatal("Error creating places link table:", err)
-	}
+func createPostGIS() error {
+	return db.Exec("CREATE EXTENSION IF NOT EXISTS postgis;").Error
 }
 
 func CreateUser(user *User) (*User, error) {
 	user.ID = uuid.New().String()
-	query := fmt.Sprintf(`INSERT INTO %s.users (id, imei, telegram_id, email, phone) VALUES ($1, $2, $3, $4, $5)`, os.Getenv("DB_SCHEMA"))
-	_, err := db.Exec(query, user.ID, user.Imei, user.TelegramId, user.Email, user.Phone)
-	if err != nil {
-		return nil, err
-	}
-	return user, nil
+	result := db.Create(user)
+	return user, result.Error
 }
 
 func CreateUserPlace(place *UserPlace) (*UserPlace, error) {
-	query := fmt.Sprintf(`INSERT INTO %s.user_places (info, geom) VALUES ($1, ST_GeogFromText($2)) RETURNING id`, os.Getenv("DB_SCHEMA"))
-	err := db.QueryRow(query, place.Info, place.Geom).Scan(&place.ID)
-	if err != nil {
-		return nil, err
-	}
-	return place, nil
+	result := db.Create(place)
+	return place, result.Error
 }
 
 func CreatePlace(place *Place) (*Place, error) {
-	query := `
-        INSERT INTO places (name, geom, description)
-        VALUES ($1, ST_GeomFromText($2, 4326), $3)
-        RETURNING id
-    `
-	var id int
-
-	err := db.QueryRow(query, place.Name, place.Geom, place.Desc).Scan(&id)
-	if err != nil {
-		return nil, err
-	}
-	return place, nil
+	result := db.Create(place)
+	return place, result.Error
 }
 
 func GetNearPlaces(myPoint gps_utils.GpsCoordinates) ([]Place, error) {
 	lat := myPoint.Lat
 	lng := myPoint.Lng
-	fmt.Println("GetNearPlaces --->>> ", lat, lng)
 
 	query := fmt.Sprintf(`
-		SELECT id, name, ST_AsText(geom), description, ST_Distance(geom::geography, ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography) AS distance
+		SELECT id, city_name, name, ST_AsText(geom) as geom, description, ST_Distance(geom::geography, ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography) AS distance
 		FROM %s.places
 		ORDER BY distance ASC`, os.Getenv("DB_SCHEMA"))
 
-	rows, err := db.Query(query, lng, lat)
-
+	rows, err := db.Raw(query, lng, lat).Rows()
 	if err != nil {
 		return nil, err
 	}
@@ -230,7 +130,7 @@ func GetNearPlaces(myPoint gps_utils.GpsCoordinates) ([]Place, error) {
 	var places []Place
 	for rows.Next() {
 		var place Place
-		err := rows.Scan(&place.ID, &place.Name, &place.Geom, &place.Desc, &place.Distance)
+		err := rows.Scan(&place.ID, &place.CityName, &place.Name, &place.Geom, &place.Desc, &place.Distance)
 		if err != nil {
 			return nil, err
 		}
